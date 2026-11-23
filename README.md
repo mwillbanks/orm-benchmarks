@@ -36,7 +36,9 @@ The row-level-security targets connect as `bench_app`, a role created by the har
 
 Each target runs in its own process. Before every iteration the dataset is restored, then each of the 14 operations runs 2 times untimed and 5 times timed (`OP_WARMUP`, `OP_SAMPLES`), and the iteration records the median of the timed calls. The restore leaves the process idle for about 100 ms, and a single call timed right after it measured 3 to 5 times a warm call, hiding most of the difference between ORMs. `OP_WARMUP=0 OP_SAMPLES=1` reproduces one timed call per iteration.
 
-`comparison.md` reports the median and p95 across iterations 2 onwards, and a first-call table: each operation's first attempt in iteration 1, which includes opening the connection and, for drivers that prepare statements, preparing it. Each CSV has a matching `.first.csv`.
+`comparison.md` reports the median and p95 across iterations 2 onwards, and a first-call table: attempt zero of each operation in iteration 1. It includes only work done inside that call: first-run code paths, statement preparation where the driver prepares on first use, and connection setup only when the target had not opened a connection before timing. ZenStack (`$connect` runs `select 1`) and TypeORM (`initialize`) open one before timing, and the policy targets reuse the one opened by their tenant check. The plain Drizzle targets open theirs inside the first timed call, and Prisma's `$connect` through the driver adapter may not open one in advance. Each CSV has a matching `.first.csv`.
+
+Upserts write a different value on every attempt, so an ORM that skips an unchanged update (TypeORM's `save`) does the same work as the others.
 
 The timer starts before the query is built: each operation is passed to `measure` as a function, so an ORM whose queries are eager promises is timed the same way as one whose queries are lazy.
 

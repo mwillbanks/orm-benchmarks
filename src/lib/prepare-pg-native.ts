@@ -15,6 +15,26 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 import { promises as fsPromises } from 'fs';
+import { execFileSync } from 'child_process';
+
+/**
+ * The dump's table of contents without row-level-security entries. The seeding path keeps the
+ * schema, so a dump made after a policy run can contain policies naming the bench_app role, which
+ * may not exist on the server being restored. Policies are applied after the restore for policy
+ * targets only (src/lib/policies.ts), and grants are skipped with --no-acl.
+ */
+function restoreList(filePath: string): string {
+    const listPath = `${filePath}.list`;
+    const toc = execFileSync('pg_restore', ['-l', filePath], { encoding: 'utf8' });
+    fs.writeFileSync(
+        listPath,
+        toc
+            .split('\n')
+            .filter((line) => !/ (POLICY|ROW SECURITY) /.test(line))
+            .join('\n'),
+    );
+    return listPath;
+}
 
 export async function preparePg(options: {
     databaseUrl: string;
@@ -209,7 +229,7 @@ async function restoreFromSQLDumpPg(databaseUrl: string, filePath: string) {
     } catch (error) {
         console.error('Failed to execute psql command.');
     }
-    const command = `pg_restore -h ${host} -p ${port || 5432} -U ${user} -d ${db} --no-owner -v ${filePath}`;
+    const command = `pg_restore -h ${host} -p ${port || 5432} -U ${user} -d ${db} --no-owner --no-acl -L ${restoreList(filePath)} -v ${filePath}`;
     console.log(`SQL restore command: `, command);
     try {
         await executeCommand(command, { PGPASSWORD: password });

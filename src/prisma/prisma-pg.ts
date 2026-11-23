@@ -212,11 +212,12 @@ export async function prismaPg(
      */
 
     results.push(
-        await measure('prisma-upsert', () =>
+        // Each attempt writes a new value, so no ORM can skip the update as unchanged.
+        await measure('prisma-upsert', (attempt) =>
             prisma.customer.upsert({
                 where: { id: 1 },
                 update: {
-                    name: 'John Doe Upserted',
+                    name: `John Doe Upserted ${attempt}`,
                 },
                 create: {
                     name: 'John Doe',
@@ -227,14 +228,14 @@ export async function prismaPg(
     );
 
     results.push(
-        await measure('prisma-nested-upsert', () =>
+        await measure('prisma-nested-upsert', (attempt) =>
             prisma.customer.upsert({
                 where: { id: 1 },
                 update: {
-                    name: 'John Doe Upserted',
+                    name: `John Doe Upserted ${attempt}`,
                     address: {
                         update: {
-                            street: '456 New St',
+                            street: `456 New St ${attempt}`,
                         },
                     },
                 },

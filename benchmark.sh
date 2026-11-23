@@ -44,33 +44,56 @@ mkdir -p "$RESULTS_DIR"
 
 start_time=$(date +%s)
 
+# A failed build or target is recorded and the run goes on, so one failure does not lose the
+# other targets' results. The script exits non-zero at the end if anything failed.
+failed=""
+record_failure() {
+  echo "!! $1 failed"
+  failed="${failed}  $1"$'\n'
+}
+
 for runtime in $runtimes; do
   case $runtime in
-    node) npm run --silent build; run=(node --max-old-space-size=4096 dist/main.js) ;;
+    node)
+      if ! npm run --silent build; then
+        record_failure "node build"
+        continue
+      fi
+      run=(node --max-old-space-size=4096 dist/main.js) ;;
     bun) run=(bun src/main.ts) ;;
     *) echo "Unknown runtime: $runtime"; exit 1 ;;
   esac
   if [ -n "$targets" ]; then
     list="${targets//,/ }"
-  else
-    list=$("${run[@]}" --list)
+  elif ! list=$("${run[@]}" --list); then
+    record_failure "target list on $runtime"
+    continue
   fi
   for target in $list; do
     # A target such as `drizzle:bun-sql` only exists on Bun. Skip what this runtime cannot run.
     if [[ "$target" == *bun-sql* && "$runtime" != "bun" ]]; then continue; fi
     echo "== $target on $runtime"
-    TARGETS="$target" "${run[@]}"
+    if ! TARGETS="$target" "${run[@]}"; then
+      record_failure "$target on $runtime"
+    fi
   done
 done
 
-# One comparison across every target and runtime in this run.
+# One comparison across every target and runtime that finished.
 if command -v bun >/dev/null; then
-  bun src/summary.ts "$RESULTS_DIR"
+  bun src/summary.ts "$RESULTS_DIR" || record_failure "summary"
+elif [ -f dist/summary.js ]; then
+  node dist/summary.js "$RESULTS_DIR" || record_failure "summary"
 else
-  npm run --silent build && node dist/summary.js "$RESULTS_DIR"
+  record_failure "summary (no Bun and no Node build)"
 fi
 
 end_time=$(date +%s)
 elapsed_time=$((end_time - start_time))
 echo "Benchmark completed in $((elapsed_time / 60)) minutes and $((elapsed_time % 60)) seconds."
 echo "Results: $RESULTS_DIR/comparison.md"
+
+if [ -n "$failed" ]; then
+  printf 'Failed:\n%s' "$failed"
+  exit 1
+fi

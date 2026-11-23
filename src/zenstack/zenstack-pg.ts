@@ -215,11 +215,12 @@ export async function zenstackPg(
      */
 
     results.push(
-        await measure('zenstack-upsert', () =>
+        // Each attempt writes a new value, so no ORM can skip the update as unchanged.
+        await measure('zenstack-upsert', (attempt) =>
             db.customer.upsert({
                 where: { id: 1 },
                 update: {
-                    name: 'John Doe Upserted',
+                    name: `John Doe Upserted ${attempt}`,
                 },
                 create: {
                     name: 'John Doe',
@@ -230,14 +231,14 @@ export async function zenstackPg(
     );
 
     results.push(
-        await measure('zenstack-nested-upsert', () =>
+        await measure('zenstack-nested-upsert', (attempt) =>
             db.customer.upsert({
                 where: { id: 1 },
                 update: {
-                    name: 'John Doe Upserted',
+                    name: `John Doe Upserted ${attempt}`,
                     address: {
                         update: {
-                            street: '456 New St',
+                            street: `456 New St ${attempt}`,
                         },
                     },
                 },

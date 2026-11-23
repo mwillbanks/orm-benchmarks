@@ -20,11 +20,9 @@ const runners: Record<ORM, (databaseUrl: string, driver: Driver, policy: boolean
 
 /**
  * Runs every target for `iterations` iterations. Before each iteration the dataset is restored, then
- * each of the 14 operations runs once, in a fixed order.
- *
- * Iteration 1 is the first time each statement runs on its connection, so it carries connection setup
- * and, for drivers that prepare statements, one extra round trip per statement. The summary reports it
- * separately as the first call and computes the medians from the remaining iterations.
+ * each of the 14 operations runs in a fixed order, with warm-up and timed attempts (src/lib/measure.ts).
+ * The summary computes medians from iterations 2 onwards and reports iteration 1's first attempts
+ * separately.
  */
 export default async function runBenchmarksPg(benchmarkOptions: BenchmarkOptions, targets: Target[]) {
     const { databaseUrl, iterations, size, fakerSeed } = benchmarkOptions;
@@ -35,7 +33,8 @@ export default async function runBenchmarksPg(benchmarkOptions: BenchmarkOptions
         const results: MultipleBenchmarkRunResults = [];
         for (let i = 0; i < iterations; i++) {
             await preparePg({ databaseUrl, size, fakerSeed });
-            await applyRowLevelSecurity(databaseUrl);
+            // Only policy targets need the role and policies, so plain targets need no extra privileges.
+            if (target.policy) await applyRowLevelSecurity(databaseUrl);
             results.push(await runners[target.orm](databaseUrl, target.driver, target.policy));
         }
         const name = targetName(target);

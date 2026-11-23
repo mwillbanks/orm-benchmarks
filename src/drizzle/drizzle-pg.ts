@@ -310,8 +310,9 @@ export async function drizzlePg(
      */
     results.push(
         await measure(
+            // Each attempt writes a new value, so no ORM can skip the update as unchanged.
             'drizzle-upsert',
-            scoped(() =>
+            scoped((attempt) =>
                 db
                     .insert(schema.Customer)
                     .values({
@@ -322,13 +323,13 @@ export async function drizzlePg(
                     })
                     .onConflictDoUpdate({
                         target: schema.Customer.id,
-                        set: { name: 'John Doe Upserted' },
+                        set: { name: `John Doe Upserted ${attempt}` },
                     }),
             ),
         ),
     );
 
-    const nestedUpsert = () =>
+    const nestedUpsert = (attempt: number) =>
         db.transaction(async (trx) => {
             // Update customer name
             const customer = await trx
@@ -341,7 +342,7 @@ export async function drizzlePg(
                 })
                 .onConflictDoUpdate({
                     target: schema.Customer.id,
-                    set: { name: 'John Doe Upserted' },
+                    set: { name: `John Doe Upserted ${attempt}` },
                 })
                 .returning();
             const customerId = customer[0].id;
@@ -358,7 +359,7 @@ export async function drizzlePg(
                 })
                 .onConflictDoUpdate({
                     target: schema.Address.customerId,
-                    set: { street: '456 New St' },
+                    set: { street: `456 New St ${attempt}` },
                 });
         });
     results.push(await measure('drizzle-nested-upsert', scoped(nestedUpsert)));

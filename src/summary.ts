@@ -87,7 +87,7 @@ ${table(targets, queries, (stats) => stats.median, baseline)}
 ${table(targets, queries, (stats) => stats.p95, baseline)}
 ## First call (iteration 1)
 
-The first attempt of each operation in the first iteration, before any warm-up. It includes opening the connection and, for drivers that prepare statements, preparing it.
+Attempt zero of each operation in the first iteration, before any warm-up. It includes only work done inside that call: preparing the statement, for drivers that prepare on first use, and opening a connection only when the target had not opened one before timing. Connection setup and the policy targets' isolation check happen before timing and are not in these numbers.
 
 ${table(targets, queries, (stats) => stats.first)}`;
 

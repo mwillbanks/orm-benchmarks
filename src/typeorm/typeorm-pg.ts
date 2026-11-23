@@ -263,11 +263,12 @@ export async function typeormPg(
      */
     results.push(
         await measure(
+            // Each attempt writes a new value: save() skips the UPDATE when nothing changed.
             'typeorm-upsert',
-            scoped(() =>
+            scoped((attempt) =>
                 ds.getRepository(Customer).save({
                     id: 1,
-                    name: 'John Doe Upserted',
+                    name: `John Doe Upserted ${attempt}`,
                     email: 'john.doe@example.com',
                     isActive: false,
                 }),
@@ -276,12 +277,12 @@ export async function typeormPg(
     );
 
     // Nested upsert operation using transaction
-    const nestedUpsert = () =>
+    const nestedUpsert = (attempt: number) =>
         ds.transaction(async (transactionalEntityManager) => {
             // Upsert Customer
             const customer = await transactionalEntityManager.save(Customer, {
                 id: 1, // Set the ID if you want to update an existing record
-                name: 'John Doe Upserted',
+                name: `John Doe Upserted ${attempt}`,
                 email: 'john.doe@example.com',
                 isActive: false,
             });
@@ -290,7 +291,7 @@ export async function typeormPg(
             await transactionalEntityManager.save(Address, {
                 id: 1, // Set the ID if you want to update an existing record
                 customer: customer,
-                street: '456 New St',
+                street: `456 New St ${attempt}`,
                 city: 'Anytown',
                 postalCode: '12345',
                 country: 'Country',

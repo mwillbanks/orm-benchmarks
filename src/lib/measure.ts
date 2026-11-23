@@ -30,7 +30,11 @@ export default async function measure(
         if (attempt >= WARMUP) times.push(elapsedTime);
     }
     times.sort((a, b) => a - b);
-    const elapsedTime = times[Math.floor(times.length / 2)];
+    const middle = Math.floor(times.length / 2);
+    const elapsedTime =
+        times.length % 2 === 1
+            ? times[middle]
+            : (times[middle - 1] + times[middle]) / 2;
 
     console.log(`${label}: ${elapsedTime.toFixed(2)}ms (first ${first.toFixed(2)}ms)`);
 

@@ -64,7 +64,13 @@ export function selectTargets(spec: string | undefined): Target[] {
     const available = availableTargets();
     if (!spec) return available;
     return spec.split(',').flatMap((entry) => {
-        const [orm, driver, mode] = entry.trim().split(':');
+        const [orm, driver, mode, ...rest] = entry.trim().split(':');
+        if (rest.length > 0 || (mode !== undefined && mode !== 'policy')) {
+            throw new Error(`Target ${entry}: the third part can only be "policy".`);
+        }
+        if (mode !== undefined && !driver) {
+            throw new Error(`Target ${entry}: name the driver for a policy target, such as ${orm}:pg:policy.`);
+        }
         const matches = available.filter(
             (target) =>
                 target.orm === orm &&
